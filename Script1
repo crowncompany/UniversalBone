@@ -19,10 +19,9 @@ local NAME_COLOR = Color3.fromRGB(255, 255, 255)
 local NAME_FONT = Enum.Font.Gotham
 local HEALTH_BAR_COLOR = Color3.fromRGB(0, 255, 0)
 
-local espEnabled = false  -- Variable to track the ESP status
-local activeESP = {}  -- Store active ESP components for cleanup
+local espEnabled = false
+local activeESP = {}
 
--- highlight effect
 local function applyHighlight(character)
     if character:FindFirstChild(HIGHLIGHT_NAME) then return end
 
@@ -37,7 +36,6 @@ local function applyHighlight(character)
     highlight.Parent = character
 end
 
--- add name and health bar above head
 local function createNameAndHealthTag(character, player)
     if character:FindFirstChild(NAME_TAG_NAME) then return end
 
@@ -53,7 +51,6 @@ local function createNameAndHealthTag(character, player)
     billboard.LightInfluence = 0
     billboard.MaxDistance = math.huge
 
-    -- Health bar background
     local healthBg = Instance.new("Frame")
     healthBg.Size = UDim2.new(1, 0, 0, 4)
     healthBg.Position = UDim2.new(0, 0, 0, 0)
@@ -61,7 +58,6 @@ local function createNameAndHealthTag(character, player)
     healthBg.BorderSizePixel = 0
     healthBg.Parent = billboard
 
-    -- Health bar fill
     local healthFill = Instance.new("Frame")
     healthFill.Name = "HealthFill"
     healthFill.Size = UDim2.new(1, 0, 1, 0)
@@ -69,14 +65,13 @@ local function createNameAndHealthTag(character, player)
     healthFill.BorderSizePixel = 0
     healthFill.Parent = healthBg
 
-    -- Username label
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, 0, 0, 20)
     nameLabel.Position = UDim2.new(0, 0, 0, 10)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text = player.Name
     nameLabel.TextColor3 = NAME_COLOR
-    nameLabel.TextStrokeTransparency = 0 -- Solid black border
+    nameLabel.TextStrokeTransparency = 0
     nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
     nameLabel.Font = NAME_FONT
     nameLabel.TextScaled = true
@@ -85,7 +80,6 @@ local function createNameAndHealthTag(character, player)
 
     billboard.Parent = character
 
-    -- Always-on health update loop
     RunService.RenderStepped:Connect(function()
         if character and character:FindFirstChild("Humanoid") and healthFill then
             local hp = character.Humanoid.Health
@@ -108,7 +102,7 @@ local function applyHitboxBox(character)
     hitboxPart.Anchored = true
     hitboxPart.CanCollide = false
     hitboxPart.Transparency = 1
-    hitboxPart.Size = Vector3.new(6, 7, 3) -- Adjusted to fit a typical avatar
+    hitboxPart.Size = Vector3.new(6, 7, 3)
     hitboxPart.CFrame = hrp.CFrame
     hitboxPart.Parent = character
 end
@@ -132,25 +126,24 @@ local function createDistanceIndicator(character, player)
     local text = Instance.new("TextLabel")
     text.Size = UDim2.new(1, 0, 1, 0)
     text.BackgroundTransparency = 1
-    text.TextColor3 = Color3.fromRGB(200, 200, 255)
-    text.TextStrokeTransparency = 0.5
+    text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    text.TextStrokeTransparency = 0
     text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     text.Font = NAME_FONT
-    text.TextScaled = true
+    text.TextScaled = false
+    text.TextSize = 14
     text.Text = "Distance"
     text.Parent = billboard
 
     billboard.Parent = character
 
-    -- Live distance updating
     RunService.RenderStepped:Connect(function()
         if character and character:FindFirstChild("HumanoidRootPart") and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local dist = (character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
             text.Text = string.format("%.1f meters", dist)
 
-            -- Hide ESP components if the distance is greater than 500 meters
             if dist > 500 then
-                billboard.Enabled = false  -- Hide distance label
+                billboard.Enabled = false
                 local nameTag = character:FindFirstChild(NAME_TAG_NAME)
                 if nameTag then nameTag.Enabled = false end
                 local healthTag = character:FindFirstChild(NAME_TAG_NAME)
@@ -158,7 +151,7 @@ local function createDistanceIndicator(character, player)
                 local boxTag = character:FindFirstChild(BOX_NAME)
                 if boxTag then boxTag.Enabled = false end
             else
-                billboard.Enabled = true  -- Show distance label
+                billboard.Enabled = true
                 local nameTag = character:FindFirstChild(NAME_TAG_NAME)
                 if nameTag then nameTag.Enabled = true end
                 local healthTag = character:FindFirstChild(NAME_TAG_NAME)
@@ -170,7 +163,6 @@ local function createDistanceIndicator(character, player)
     end)
 end
 
--- current apply function
 local function applyESPToPlayer(player)
     if player == localPlayer then return end
 
@@ -190,9 +182,8 @@ local function applyESPToPlayer(player)
     player.CharacterAdded:Connect(onCharacterAdded)
 end
 
--- Function to enable ESP for all players
 local function enableESP()
-    if espEnabled then return end  -- Don't enable if already enabled
+    if espEnabled then return end
 
     for _, player in ipairs(Players:GetPlayers()) do
         applyESPToPlayer(player)
@@ -202,23 +193,18 @@ local function enableESP()
     espEnabled = true
 end
 
--- Function to disable ESP for all players
 local function disableESP()
-    if not espEnabled then return end  -- Don't disable if already disabled
+    if not espEnabled then return end
 
-    -- get rid of random active esp items
     for _, player in ipairs(Players:GetPlayers()) do
         if player.Character then
             local character = player.Character
-            -- Remove Highlight
             local highlight = character:FindFirstChild(HIGHLIGHT_NAME)
             if highlight then highlight:Destroy() end
 
-            -- Remove Name and Health tags
             local nameTag = character:FindFirstChild(NAME_TAG_NAME)
             if nameTag then nameTag:Destroy() end
 
-            -- Remove Distance Indicator
             local distanceTag = character:FindFirstChild(DISTANCE_TAG_NAME)
             if distanceTag then distanceTag:Destroy() end
         end
@@ -227,7 +213,6 @@ local function disableESP()
     espEnabled = false
 end
 
--- make ui button for toggle on or off
 local screenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
 local button = Instance.new("TextButton", screenGui)
 button.Size = UDim2.new(0, 150, 0, 50)
@@ -239,7 +224,6 @@ button.Font = Enum.Font.Gotham
 button.TextSize = 18
 Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
 
--- disable and enable function for esp
 button.MouseButton1Click:Connect(function()
     if espEnabled then
         button.Text = "Enable ESP"
@@ -250,7 +234,6 @@ button.MouseButton1Click:Connect(function()
     end
 end)
 
--- apply the esp to all the existing players
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= localPlayer then
         applyESPToPlayer(player)
