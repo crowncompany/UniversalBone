@@ -147,6 +147,25 @@ local function createDistanceIndicator(character, player)
         if character and character:FindFirstChild("HumanoidRootPart") and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local dist = (character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
             text.Text = string.format("%.1f meters", dist)
+
+            -- Hide ESP components if the distance is greater than 500 meters
+            if dist > 500 then
+                billboard.Enabled = false  -- Hide distance label
+                local nameTag = character:FindFirstChild(NAME_TAG_NAME)
+                if nameTag then nameTag.Enabled = false end
+                local healthTag = character:FindFirstChild(NAME_TAG_NAME)
+                if healthTag then healthTag.Enabled = false end
+                local boxTag = character:FindFirstChild(BOX_NAME)
+                if boxTag then boxTag.Enabled = false end
+            else
+                billboard.Enabled = true  -- Show distance label
+                local nameTag = character:FindFirstChild(NAME_TAG_NAME)
+                if nameTag then nameTag.Enabled = true end
+                local healthTag = character:FindFirstChild(NAME_TAG_NAME)
+                if healthTag then healthTag.Enabled = true end
+                local boxTag = character:FindFirstChild(BOX_NAME)
+                if boxTag then boxTag.Enabled = true end
+            end
         end
     end)
 end
@@ -187,7 +206,7 @@ end
 local function disableESP()
     if not espEnabled then return end  -- Don't disable if already disabled
 
-    -- Remove active ESP objects
+    -- get rid of random active esp items
     for _, player in ipairs(Players:GetPlayers()) do
         if player.Character then
             local character = player.Character
@@ -208,7 +227,7 @@ local function disableESP()
     espEnabled = false
 end
 
--- Create the UI Button for ESP Toggle
+-- make ui button for toggle on or off
 local screenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
 local button = Instance.new("TextButton", screenGui)
 button.Size = UDim2.new(0, 150, 0, 50)
@@ -220,7 +239,7 @@ button.Font = Enum.Font.Gotham
 button.TextSize = 18
 Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
 
--- Button click function to toggle ESP
+-- disable and enable function for esp
 button.MouseButton1Click:Connect(function()
     if espEnabled then
         button.Text = "Enable ESP"
@@ -231,7 +250,7 @@ button.MouseButton1Click:Connect(function()
     end
 end)
 
--- Apply ESP to existing players
+-- apply the esp to all the existing players
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= localPlayer then
         applyESPToPlayer(player)
