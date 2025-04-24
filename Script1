@@ -3,217 +3,283 @@ local RunService = game:GetService("RunService")
 
 local localPlayer = Players.LocalPlayer
 
--- constantboxnames
+-- Constants
 local HIGHLIGHT_NAME = "UniversalESP_Highlight"
 local NAME_TAG_NAME = "UniversalESP_NameTag"
 local BOX_NAME = "UniversalESP_Box"
 local DISTANCE_TAG_NAME = "UniversalESP_Distance"
 
--- rgb settings
-local HIGHLIGHT_COLOR = Color3.fromRGB(173, 216, 230)
+-- UI/Visual settings
 local FILL_TRANSPARENCY = 0.75
-local OUTLINE_COLOR = Color3.fromRGB(0, 191, 255)
 local OUTLINE_TRANSPARENCY = 0
 
 local NAME_COLOR = Color3.fromRGB(255, 255, 255)
 local NAME_FONT = Enum.Font.Gotham
 local HEALTH_BAR_COLOR = Color3.fromRGB(0, 255, 0)
 
+-- Rainbow cycle
+local hue = 0
+local rainbowSpeed = 0.5
 local espEnabled = false
-local activeESP = {}
+local colorCycleConnection
+local playerAddedConnection
 
+-- Maximum distance to display ESP
+local MAX_DISTANCE = 500
+
+-- Function to update visibility based on distance
+local function updateVisibility(character, distance)
+	local shouldHide = distance > MAX_DISTANCE
+
+	-- Hide or show ESP elements based on distance
+	local highlight = character:FindFirstChild(HIGHLIGHT_NAME)
+	if highlight then
+		highlight.Enabled = not shouldHide
+	end
+
+	local nameTag = character:FindFirstChild(NAME_TAG_NAME)
+	if nameTag then
+		nameTag.Enabled = not shouldHide
+	end
+
+	local distanceTag = character:FindFirstChild(DISTANCE_TAG_NAME)
+	if distanceTag then
+		distanceTag.Enabled = not shouldHide
+	end
+
+	local healthTag = character:FindFirstChild(NAME_TAG_NAME)
+	if healthTag then
+		local healthFill = healthTag:FindFirstChild("HealthFill")
+		if healthFill then
+			healthFill.Visible = not shouldHide
+		end
+	end
+end
+
+-- Apply highlight
 local function applyHighlight(character)
-    if character:FindFirstChild(HIGHLIGHT_NAME) then return end
+	if character:FindFirstChild(HIGHLIGHT_NAME) then return end
 
-    local highlight = Instance.new("Highlight")
-    highlight.Name = HIGHLIGHT_NAME
-    highlight.Adornee = character
-    highlight.FillColor = HIGHLIGHT_COLOR
-    highlight.FillTransparency = FILL_TRANSPARENCY
-    highlight.OutlineColor = OUTLINE_COLOR
-    highlight.OutlineTransparency = OUTLINE_TRANSPARENCY
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = character
+	local highlight = Instance.new("Highlight")
+	highlight.Name = HIGHLIGHT_NAME
+	highlight.Adornee = character
+	highlight.FillColor = Color3.fromHSV(hue, 1, 1)
+	highlight.FillTransparency = FILL_TRANSPARENCY
+	highlight.OutlineColor = Color3.fromHSV(hue, 1, 1)
+	highlight.OutlineTransparency = OUTLINE_TRANSPARENCY
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = character
 end
 
+-- Name + health tag
 local function createNameAndHealthTag(character, player)
-    if character:FindFirstChild(NAME_TAG_NAME) then return end
+	if character:FindFirstChild(NAME_TAG_NAME) then return end
 
-    local head = character:FindFirstChild("Head")
-    if not head then return end
+	local head = character:FindFirstChild("Head")
+	if not head then return end
 
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = NAME_TAG_NAME
-    billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 100, 0, 40)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.AlwaysOnTop = true
-    billboard.LightInfluence = 0
-    billboard.MaxDistance = math.huge
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = NAME_TAG_NAME
+	billboard.Adornee = head
+	billboard.Size = UDim2.new(0, 100, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = math.huge
 
-    local healthBg = Instance.new("Frame")
-    healthBg.Size = UDim2.new(1, 0, 0, 4)
-    healthBg.Position = UDim2.new(0, 0, 0, 0)
-    healthBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    healthBg.BorderSizePixel = 0
-    healthBg.Parent = billboard
+	local healthBg = Instance.new("Frame")
+	healthBg.Size = UDim2.new(1, 0, 0, 4)
+	healthBg.Position = UDim2.new(0, 0, 0, 0)
+	healthBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	healthBg.BorderSizePixel = 0
+	healthBg.Parent = billboard
 
-    local healthFill = Instance.new("Frame")
-    healthFill.Name = "HealthFill"
-    healthFill.Size = UDim2.new(1, 0, 1, 0)
-    healthFill.BackgroundColor3 = HEALTH_BAR_COLOR
-    healthFill.BorderSizePixel = 0
-    healthFill.Parent = healthBg
+	local healthFill = Instance.new("Frame")
+	healthFill.Name = "HealthFill"
+	healthFill.Size = UDim2.new(1, 0, 1, 0)
+	healthFill.BackgroundColor3 = HEALTH_BAR_COLOR
+	healthFill.BorderSizePixel = 0
+	healthFill.Parent = healthBg
 
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 0, 20)
-    nameLabel.Position = UDim2.new(0, 0, 0, 10)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = NAME_COLOR
-    nameLabel.TextStrokeTransparency = 0
-    nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    nameLabel.Font = NAME_FONT
-    nameLabel.TextScaled = true
-    nameLabel.TextWrapped = true
-    nameLabel.Parent = billboard
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, 0, 0, 20)
+	nameLabel.Position = UDim2.new(0, 0, 0, 10)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = player.Name
+	nameLabel.TextColor3 = NAME_COLOR
+	nameLabel.TextStrokeTransparency = 0
+	nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+	nameLabel.Font = NAME_FONT
+	nameLabel.TextScaled = true
+	nameLabel.TextWrapped = true
+	nameLabel.Parent = billboard
 
-    billboard.Parent = character
+	billboard.Parent = character
 
-    RunService.RenderStepped:Connect(function()
-        if character and character:FindFirstChild("Humanoid") and healthFill then
-            local hp = character.Humanoid.Health
-            local maxHp = character.Humanoid.MaxHealth
-            if maxHp > 0 then
-                healthFill.Size = UDim2.new(math.clamp(hp / maxHp, 0, 1), 0, 1, 0)
-            end
-        end
-    end)
+	RunService.RenderStepped:Connect(function()
+		if character and character:FindFirstChild("Humanoid") and healthFill then
+			local hp = character.Humanoid.Health
+			local maxHp = character.Humanoid.MaxHealth
+			if maxHp > 0 then
+				healthFill.Size = UDim2.new(math.clamp(hp / maxHp, 0, 1), 0, 1, 0)
+			end
+		end
+
+		if character and character:FindFirstChild("HumanoidRootPart") and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+			updateVisibility(character, dist)
+		end
+	end)
 end
 
+-- Fake hitbox
 local function applyHitboxBox(character)
-    if character:FindFirstChild(BOX_NAME) then return end
+	if character:FindFirstChild(BOX_NAME) then return end
 
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
 
-    local hitboxPart = Instance.new("Part")
-    hitboxPart.Name = "HitboxPart"
-    hitboxPart.Anchored = true
-    hitboxPart.CanCollide = false
-    hitboxPart.Transparency = 1
-    hitboxPart.Size = Vector3.new(6, 7, 3)
-    hitboxPart.CFrame = hrp.CFrame
-    hitboxPart.Parent = character
+	local hitboxPart = Instance.new("Part")
+	hitboxPart.Name = BOX_NAME
+	hitboxPart.Anchored = true
+	hitboxPart.CanCollide = false
+	hitboxPart.Transparency = 1
+	hitboxPart.Size = Vector3.new(6, 7, 3)
+	hitboxPart.CFrame = hrp.CFrame
+	hitboxPart.Parent = character
 end
 
--- distance in meters
+-- Distance label
 local function createDistanceIndicator(character, player)
-    if character:FindFirstChild(DISTANCE_TAG_NAME) then return end
+	if character:FindFirstChild(DISTANCE_TAG_NAME) then return end
 
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
 
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = DISTANCE_TAG_NAME
-    billboard.Adornee = hrp
-    billboard.Size = UDim2.new(0, 100, 0, 20)
-    billboard.StudsOffset = Vector3.new(0, -2.5, 0)
-    billboard.AlwaysOnTop = true
-    billboard.LightInfluence = 0
-    billboard.MaxDistance = math.huge
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = DISTANCE_TAG_NAME
+	billboard.Adornee = hrp
+	billboard.Size = UDim2.new(0, 100, 0, 20)
+	billboard.StudsOffset = Vector3.new(0, -2.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = math.huge
 
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1, 0, 1, 0)
-    text.BackgroundTransparency = 1
-    text.TextColor3 = Color3.fromRGB(255, 255, 255)
-    text.TextStrokeTransparency = 0
-    text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    text.Font = NAME_FONT
-    text.TextScaled = false
-    text.TextSize = 14
-    text.Text = "Distance"
-    text.Parent = billboard
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.new(1, 0, 1, 0)
+	text.BackgroundTransparency = 1
+	text.TextColor3 = Color3.fromRGB(255, 255, 255)
+	text.TextStrokeTransparency = 0
+	text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	text.Font = NAME_FONT
+	text.TextScaled = false
+	text.TextSize = 14
+	text.Text = "Distance"
+	text.Parent = billboard
 
-    billboard.Parent = character
+	billboard.Parent = character
 
-    RunService.RenderStepped:Connect(function()
-        if character and character:FindFirstChild("HumanoidRootPart") and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
-            text.Text = string.format("%.1f meters", dist)
-
-            if dist > 500 then
-                billboard.Enabled = false
-                local nameTag = character:FindFirstChild(NAME_TAG_NAME)
-                if nameTag then nameTag.Enabled = false end
-                local healthTag = character:FindFirstChild(NAME_TAG_NAME)
-                if healthTag then healthTag.Enabled = false end
-                local boxTag = character:FindFirstChild(BOX_NAME)
-                if boxTag then boxTag.Enabled = false end
-            else
-                billboard.Enabled = true
-                local nameTag = character:FindFirstChild(NAME_TAG_NAME)
-                if nameTag then nameTag.Enabled = true end
-                local healthTag = character:FindFirstChild(NAME_TAG_NAME)
-                if healthTag then healthTag.Enabled = true end
-                local boxTag = character:FindFirstChild(BOX_NAME)
-                if boxTag then boxTag.Enabled = true end
-            end
-        end
-    end)
+	RunService.RenderStepped:Connect(function()
+		if character and character:FindFirstChild("HumanoidRootPart") and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+			text.Text = string.format("%.1f meters", dist)
+			updateVisibility(character, dist)
+		end
+	end)
 end
 
+-- Apply ESP to one player
 local function applyESPToPlayer(player)
-    if player == localPlayer then return end
+	if player == localPlayer or not espEnabled then return end
 
-    local function onCharacterAdded(character)
-        repeat task.wait() until character:IsDescendantOf(workspace)
+	local function onCharacterAdded(character)
+		repeat task.wait() until character:IsDescendantOf(workspace)
 
-        applyHighlight(character)
-        createNameAndHealthTag(character, player)
-        applyHitboxBox(character)
-        createDistanceIndicator(character, player)
-    end
+		if espEnabled then
+			applyHighlight(character)
+			createNameAndHealthTag(character, player)
+			applyHitboxBox(character)
+			createDistanceIndicator(character, player)
+		end
+	end
 
-    if player.Character then
-        onCharacterAdded(player.Character)
-    end
+	if player.Character then
+		onCharacterAdded(player.Character)
+	end
 
-    player.CharacterAdded:Connect(onCharacterAdded)
+	player.CharacterAdded:Connect(onCharacterAdded)
 end
 
+-- Rainbow color updater
+local function startRainbowCycle()
+	colorCycleConnection = RunService.RenderStepped:Connect(function(dt)
+		if not espEnabled then return end
+
+		hue = (hue + dt * rainbowSpeed) % 1
+		local color = Color3.fromHSV(hue, 1, 1)
+
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= localPlayer and player.Character then
+				local highlight = player.Character:FindFirstChild(HIGHLIGHT_NAME)
+				if highlight then
+					highlight.FillColor = color
+					highlight.OutlineColor = color
+				end
+			end
+		end
+	end)
+end
+
+-- Enable ESP
 local function enableESP()
-    if espEnabled then return end
+	if espEnabled then return end
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        applyESPToPlayer(player)
-    end
+	espEnabled = true
 
-    Players.PlayerAdded:Connect(applyESPToPlayer)
-    espEnabled = true
+	for _, player in ipairs(Players:GetPlayers()) do
+		applyESPToPlayer(player)
+	end
+
+	playerAddedConnection = Players.PlayerAdded:Connect(function(player)
+		applyESPToPlayer(player)
+	end)
+
+	startRainbowCycle()
 end
 
+-- Disable ESP
 local function disableESP()
-    if not espEnabled then return end
+	if not espEnabled then return end
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character then
-            local character = player.Character
-            local highlight = character:FindFirstChild(HIGHLIGHT_NAME)
-            if highlight then highlight:Destroy() end
+	if colorCycleConnection then
+		colorCycleConnection:Disconnect()
+		colorCycleConnection = nil
+	end
 
-            local nameTag = character:FindFirstChild(NAME_TAG_NAME)
-            if nameTag then nameTag:Destroy() end
+	if playerAddedConnection then
+		playerAddedConnection:Disconnect()
+		playerAddedConnection = nil
+	end
 
-            local distanceTag = character:FindFirstChild(DISTANCE_TAG_NAME)
-            if distanceTag then distanceTag:Destroy() end
-        end
-    end
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character then
+			local character = player.Character
+			local highlight = character:FindFirstChild(HIGHLIGHT_NAME)
+			if highlight then highlight:Destroy() end
 
-    espEnabled = false
+			local nameTag = character:FindFirstChild(NAME_TAG_NAME)
+			if nameTag then nameTag:Destroy() end
+
+			local distanceTag = character:FindFirstChild(DISTANCE_TAG_NAME)
+			if distanceTag then distanceTag:Destroy() end
+		end
+	end
+
+	espEnabled = false
 end
 
-local screenGui = Instance.new("ScreenGui", localPlayer.PlayerGui)
+-- Toggle button UI
+local screenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
 local button = Instance.new("TextButton", screenGui)
 button.Size = UDim2.new(0, 150, 0, 50)
 button.Position = UDim2.new(0, 10, 0, 10)
@@ -225,19 +291,20 @@ button.TextSize = 18
 Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
 
 button.MouseButton1Click:Connect(function()
-    if espEnabled then
-        button.Text = "Enable ESP"
-        disableESP()
-    else
-        button.Text = "Disable ESP"
-        enableESP()
-    end
+	if espEnabled then
+		button.Text = "Enable ESP"
+		disableESP()
+	else
+		button.Text = "Disable ESP"
+		enableESP()
+	end
 end)
 
+-- Initial player scan
 for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= localPlayer then
-        applyESPToPlayer(player)
-    end
+	if player ~= localPlayer then
+		applyESPToPlayer(player)
+	end
 end
 
 Players.PlayerAdded:Connect(applyESPToPlayer)
