@@ -24,39 +24,53 @@ local espEnabled = false
 local colorCycleConnection
 local playerAddedConnection
 
--- Maximum distance to display ESP
 local MAX_DISTANCE = 500
 
--- Function to update visibility based on distance
 local function updateVisibility(character, distance)
 	local shouldHide = distance > MAX_DISTANCE
+	local distanceRatio = math.clamp(distance / MAX_DISTANCE, 0, 1)
+	local scaleFactor = math.clamp(1 - distanceRatio * 0.75, 0.25, 1)
 
-	-- Hide or show ESP elements based on distance
 	local highlight = character:FindFirstChild(HIGHLIGHT_NAME)
 	if highlight then
 		highlight.Enabled = not shouldHide
+		highlight.FillTransparency = FILL_TRANSPARENCY + (distanceRatio * 0.25)
+		highlight.OutlineTransparency = OUTLINE_TRANSPARENCY + (distanceRatio * 0.5)
 	end
 
 	local nameTag = character:FindFirstChild(NAME_TAG_NAME)
 	if nameTag then
 		nameTag.Enabled = not shouldHide
+		nameTag.Size = UDim2.new(0, 100 * scaleFactor, 0, 40 * scaleFactor)
+
+		local nameLabel = nameTag:FindFirstChildOfClass("TextLabel")
+		if nameLabel then
+			nameLabel.TextSize = 12 * scaleFactor
+		end
+
+		local healthBg = nameTag:FindFirstChildOfClass("Frame")
+		if healthBg then
+			healthBg.Size = UDim2.new(1, 0, 0, 6 * scaleFactor)
+
+			local healthFill = healthBg:FindFirstChild("HealthFill")
+			if healthFill then
+				healthFill.Visible = not shouldHide
+			end
+		end
 	end
 
 	local distanceTag = character:FindFirstChild(DISTANCE_TAG_NAME)
 	if distanceTag then
 		distanceTag.Enabled = not shouldHide
-	end
+		distanceTag.Size = UDim2.new(0, 100 * scaleFactor, 0, 20 * scaleFactor)
 
-	local healthTag = character:FindFirstChild(NAME_TAG_NAME)
-	if healthTag then
-		local healthFill = healthTag:FindFirstChild("HealthFill")
-		if healthFill then
-			healthFill.Visible = not shouldHide
+		local label = distanceTag:FindFirstChildOfClass("TextLabel")
+		if label then
+			label.TextSize = 14 * scaleFactor
 		end
 	end
 end
 
--- Apply highlight
 local function applyHighlight(character)
 	if character:FindFirstChild(HIGHLIGHT_NAME) then return end
 
@@ -71,7 +85,6 @@ local function applyHighlight(character)
 	highlight.Parent = character
 end
 
--- Name + health tag
 local function createNameAndHealthTag(character, player)
 	if character:FindFirstChild(NAME_TAG_NAME) then return end
 
@@ -88,7 +101,7 @@ local function createNameAndHealthTag(character, player)
 	billboard.MaxDistance = math.huge
 
 	local healthBg = Instance.new("Frame")
-	healthBg.Size = UDim2.new(1, 0, 0, 4)
+	healthBg.Size = UDim2.new(1, 0, 0, 6)
 	healthBg.Position = UDim2.new(0, 0, 0, 0)
 	healthBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	healthBg.BorderSizePixel = 0
@@ -110,7 +123,8 @@ local function createNameAndHealthTag(character, player)
 	nameLabel.TextStrokeTransparency = 0
 	nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 	nameLabel.Font = NAME_FONT
-	nameLabel.TextScaled = true
+	nameLabel.TextScaled = false
+	nameLabel.TextSize = 12
 	nameLabel.TextWrapped = true
 	nameLabel.Parent = billboard
 
@@ -132,7 +146,6 @@ local function createNameAndHealthTag(character, player)
 	end)
 end
 
--- Fake hitbox
 local function applyHitboxBox(character)
 	if character:FindFirstChild(BOX_NAME) then return end
 
@@ -149,7 +162,6 @@ local function applyHitboxBox(character)
 	hitboxPart.Parent = character
 end
 
--- Distance label
 local function createDistanceIndicator(character, player)
 	if character:FindFirstChild(DISTANCE_TAG_NAME) then return end
 
@@ -188,7 +200,6 @@ local function createDistanceIndicator(character, player)
 	end)
 end
 
--- Apply ESP to one player
 local function applyESPToPlayer(player)
 	if player == localPlayer or not espEnabled then return end
 
@@ -210,7 +221,6 @@ local function applyESPToPlayer(player)
 	player.CharacterAdded:Connect(onCharacterAdded)
 end
 
--- Rainbow color updater
 local function startRainbowCycle()
 	colorCycleConnection = RunService.RenderStepped:Connect(function(dt)
 		if not espEnabled then return end
@@ -230,7 +240,6 @@ local function startRainbowCycle()
 	end)
 end
 
--- Enable ESP
 local function enableESP()
 	if espEnabled then return end
 
@@ -247,7 +256,6 @@ local function enableESP()
 	startRainbowCycle()
 end
 
--- Disable ESP
 local function disableESP()
 	if not espEnabled then return end
 
@@ -278,7 +286,6 @@ local function disableESP()
 	espEnabled = false
 end
 
--- Toggle button UI
 local screenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
 local button = Instance.new("TextButton", screenGui)
 button.Size = UDim2.new(0, 150, 0, 50)
@@ -300,7 +307,6 @@ button.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Initial player scan
 for _, player in ipairs(Players:GetPlayers()) do
 	if player ~= localPlayer then
 		applyESPToPlayer(player)
